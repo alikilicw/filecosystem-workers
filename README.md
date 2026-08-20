@@ -1,12 +1,14 @@
 # filecosystem-workers
 
-Consumes transformation jobs published by
-[`filecosystem-be`](../filecosystem-be), processes the file with libvips and
-reports the outcome back over RabbitMQ.
+Consumes work published by [`filecosystem-be`](../filecosystem-be), does it with
+libvips, and reports the outcome back over RabbitMQ. One process runs one
+consumer:
 
-A worker is stateless: it reads the source from object storage, writes the
-result next to it, and publishes a `job.result` event. It never touches
-Postgres, so scaling out means starting more replicas.
+- **image jobs** (`image.jobs`) — transform a file and store the result.
+
+A worker is stateless: it reads from object storage, writes next to it, and
+publishes an event. It never touches the database, so scaling out means starting
+more replicas.
 
 ## Requirements
 
@@ -46,7 +48,7 @@ user sees a real error instead of a job that never finishes.
 | Variable             | Default | Purpose                                     |
 | -------------------- | ------- | ------------------------------------------- |
 | `WORKER_CONCURRENCY` | CPU cores | Jobs processed in parallel, also the prefetch |
-| `MAX_SOURCE_BYTES`   | 50 MiB  | Largest source file a worker will decode     |
+| `MAX_SOURCE_BYTES`   | 50 MiB  | Largest file a worker will decode             |
 | `JOB_TIMEOUT`        | 2m      | Deadline for a single job                    |
 | `METRICS_ADDR`       | `:8090` | Serves `/healthz` and `/readyz`              |
 
@@ -59,10 +61,10 @@ credentials.
 cmd/worker              entrypoint and wiring
 internal/config         environment configuration
 internal/contracts      queue message schema, mirrored in filecosystem-be
-internal/processor/image libvips operations
+internal/processor/image libvips operations and image probing
 internal/queue          RabbitMQ client with reconnect
 internal/storage        Amazon S3 object storage
-internal/worker         job orchestration and result reporting
+internal/worker         image job consumer
 ```
 
 `internal/contracts/contracts.go` is duplicated byte-for-byte in the API

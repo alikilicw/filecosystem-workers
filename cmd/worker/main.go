@@ -70,7 +70,11 @@ func run(log *slog.Logger) error {
 		}
 	}()
 
-	log.Info("worker ready", "concurrency", cfg.Concurrency, "queue", contracts.QueueImageJobs, "env", cfg.Env)
+	log.Info("worker ready",
+		"concurrency", cfg.Concurrency,
+		"queues", []string{contracts.QueueImageJobs},
+		"env", cfg.Env,
+	)
 	<-ctx.Done()
 	log.Info("shutdown signal received")
 
