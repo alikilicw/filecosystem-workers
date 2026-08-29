@@ -34,7 +34,3 @@ tidy: ## Sync go.mod and go.sum
 .PHONY: vet
 vet: ## Run go vet
 	go vet ./...
-
-.PHONY: docker-build
-docker-build: ## Build the worker container image
-	docker build -t filecosystem-worker .
