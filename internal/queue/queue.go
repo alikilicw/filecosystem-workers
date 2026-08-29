@@ -80,9 +80,9 @@ func (c *Client) Start(ctx context.Context) error {
 		c.log.Warn("waiting for rabbitmq", "error", err)
 
 		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(reconnectDelay):
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(reconnectDelay):
 		}
 	}
 
@@ -118,20 +118,20 @@ func (c *Client) supervise(ctx context.Context) {
 		}
 
 		select {
-		case <-ctx.Done():
-			return
-		case err := <-closed:
-			c.log.Warn("rabbitmq connection lost, reconnecting", "error", err)
+			case <-ctx.Done():
+				return
+			case err := <-closed:
+				c.log.Warn("rabbitmq connection lost, reconnecting", "error", err)
 		}
 
 		for ctx.Err() == nil {
 			if err := c.connect(ctx); err != nil {
 				c.log.Warn("rabbitmq reconnect failed", "error", err)
 				select {
-				case <-ctx.Done():
-					return
-				case <-time.After(reconnectDelay):
-				}
+					case <-ctx.Done():
+						return
+					case <-time.After(reconnectDelay):
+					}
 				continue
 			}
 			c.log.Info("rabbitmq reconnected")
@@ -194,18 +194,18 @@ func (c *Client) startConsumer(ctx context.Context, conn *amqp.Connection, spec 
 
 			for {
 				select {
-				case <-ctx.Done():
-					return
-				case delivery, ok := <-deliveries:
-					if !ok {
+					case <-ctx.Done():
 						return
-					}
-					if err := spec.handler(ctx, delivery.Body); err != nil {
-						c.log.Error("message handling failed", "queue", spec.queue, "error", err)
-						_ = delivery.Nack(false, false)
-						continue
-					}
-					_ = delivery.Ack(false)
+					case delivery, ok := <-deliveries:
+						if !ok {
+							return
+						}
+						if err := spec.handler(ctx, delivery.Body); err != nil {
+							c.log.Error("message handling failed", "queue", spec.queue, "error", err)
+							_ = delivery.Nack(false, false)
+							continue
+						}
+						_ = delivery.Ack(false)
 				}
 			}
 		}()

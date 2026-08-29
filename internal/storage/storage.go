@@ -71,9 +71,9 @@ func (s *Storage) EnsureBucket(ctx context.Context) error {
 		}
 
 		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(bucketRetryDelay):
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(bucketRetryDelay):
 		}
 	}
 }

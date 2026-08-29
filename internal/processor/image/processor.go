@@ -130,30 +130,30 @@ func encode(img *vips.ImageRef, format string, params contracts.ImageParams) ([]
 	)
 
 	switch format {
-	case contracts.FormatJPEG:
-		p := vips.NewJpegExportParams()
-		p.Quality = quality
-		p.StripMetadata = params.StripMetadata
-		p.OptimizeCoding = true
-		p.Interlace = true
-		data, _, err = img.ExportJpeg(p)
+		case contracts.FormatJPEG:
+			p := vips.NewJpegExportParams()
+			p.Quality = quality
+			p.StripMetadata = params.StripMetadata
+			p.OptimizeCoding = true
+			p.Interlace = true
+			data, _, err = img.ExportJpeg(p)
 
-	case contracts.FormatPNG:
-		p := vips.NewPngExportParams()
-		p.Compression = pngCompression(quality)
-		p.StripMetadata = params.StripMetadata
-		p.Palette = quality < paletteQualityThreshold
-		p.Quality = quality
-		data, _, err = img.ExportPng(p)
+		case contracts.FormatPNG:
+			p := vips.NewPngExportParams()
+			p.Compression = pngCompression(quality)
+			p.StripMetadata = params.StripMetadata
+			p.Palette = quality < paletteQualityThreshold
+			p.Quality = quality
+			data, _, err = img.ExportPng(p)
 
-	case contracts.FormatWebP:
-		p := vips.NewWebpExportParams()
-		p.Quality = quality
-		p.StripMetadata = params.StripMetadata
-		data, _, err = img.ExportWebp(p)
+		case contracts.FormatWebP:
+			p := vips.NewWebpExportParams()
+			p.Quality = quality
+			p.StripMetadata = params.StripMetadata
+			data, _, err = img.ExportWebp(p)
 
-	default:
-		return nil, "", "", fmt.Errorf("unsupported output format %q", format)
+		default:
+			return nil, "", "", fmt.Errorf("unsupported output format %q", format)
 	}
 
 	if err != nil {
