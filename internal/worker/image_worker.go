@@ -101,7 +101,7 @@ func (w *ImageWorker) process(ctx context.Context, msg contracts.JobMessage) (co
 
 	name := resultName(msg, out.Ext)
 	key := fmt.Sprintf("results/%s/%s", msg.JobID, name)
-	if err := w.storage.Put(ctx, key, bytes.NewReader(out.Data), int64(len(out.Data)), out.Mime); err != nil {
+	if err := w.storage.Put(ctx, key, bytes.NewReader(out.Data), int64(len(out.Data)), out.Mime, name); err != nil {
 		return contracts.JobResult{}, err
 	}
 

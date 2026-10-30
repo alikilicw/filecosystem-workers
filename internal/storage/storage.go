@@ -78,14 +78,21 @@ func (s *Storage) EnsureBucket(ctx context.Context) error {
 	}
 }
 
-func (s *Storage) Put(ctx context.Context, key string, body io.Reader, size int64, contentType string) error {
-	_, err := s.client.PutObject(ctx, &s3.PutObjectInput{
+// Put stores an object. A non-empty downloadName is saved as the object's
+// Content-Disposition, so browsers download it under that name. Results are
+// served as plain CDN links, which cannot set the header per request.
+func (s *Storage) Put(ctx context.Context, key string, body io.Reader, size int64, contentType, downloadName string) error {
+	in := &s3.PutObjectInput{
 		Bucket:        aws.String(s.bucket),
 		Key:           aws.String(key),
 		Body:          body,
 		ContentLength: aws.Int64(size),
 		ContentType:   aws.String(contentType),
-	})
+	}
+	if downloadName != "" {
+		in.ContentDisposition = aws.String(attachment(downloadName))
+	}
+	_, err := s.client.PutObject(ctx, in)
 	if err != nil {
 		return fmt.Errorf("put object %s: %w", key, err)
 	}
@@ -122,9 +129,7 @@ func (s *Storage) PresignGet(ctx context.Context, key, downloadName string) (str
 		Key:    aws.String(key),
 	}
 	if downloadName != "" {
-		in.ResponseContentDisposition = aws.String(
-			fmt.Sprintf("attachment; filename*=UTF-8''%s", url.PathEscape(downloadName)),
-		)
+		in.ResponseContentDisposition = aws.String(attachment(downloadName))
 	}
 
 	req, err := s.presign.PresignGetObject(ctx, in, s3.WithPresignExpires(s.ttl))
@@ -135,3 +140,9 @@ func (s *Storage) PresignGet(ctx context.Context, key, downloadName string) (str
 }
 
 func (s *Storage) PresignTTL() time.Duration { return s.ttl }
+
+// attachment builds a Content-Disposition that makes browsers save the file
+// under name. RFC 5987 encoding keeps any character in the name safe.
+func attachment(name string) string {
+	return fmt.Sprintf("attachment; filename*=UTF-8''%s", url.PathEscape(name))
+}
