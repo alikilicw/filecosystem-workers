@@ -78,9 +78,9 @@ func (s *Storage) EnsureBucket(ctx context.Context) error {
 	}
 }
 
-// Put stores an object. A non-empty downloadName is saved as the object's
-// Content-Disposition, so browsers download it under that name. Results are
-// served as plain CDN links, which cannot set the header per request.
+// Put stores an object. A non-empty downloadName is saved in an inline
+// Content-Disposition: browsers open the file, and use that name when the
+// user saves it. Download links switch it to attachment per request.
 func (s *Storage) Put(ctx context.Context, key string, body io.Reader, size int64, contentType, downloadName string) error {
 	in := &s3.PutObjectInput{
 		Bucket:        aws.String(s.bucket),
@@ -90,7 +90,7 @@ func (s *Storage) Put(ctx context.Context, key string, body io.Reader, size int6
 		ContentType:   aws.String(contentType),
 	}
 	if downloadName != "" {
-		in.ContentDisposition = aws.String(attachment(downloadName))
+		in.ContentDisposition = aws.String(inline(downloadName))
 	}
 	_, err := s.client.PutObject(ctx, in)
 	if err != nil {
@@ -145,4 +145,10 @@ func (s *Storage) PresignTTL() time.Duration { return s.ttl }
 // under name. RFC 5987 encoding keeps any character in the name safe.
 func attachment(name string) string {
 	return fmt.Sprintf("attachment; filename*=UTF-8''%s", url.PathEscape(name))
+}
+
+// inline builds a Content-Disposition that lets browsers show the file and
+// suggests name when it is saved.
+func inline(name string) string {
+	return fmt.Sprintf("inline; filename*=UTF-8''%s", url.PathEscape(name))
 }
