@@ -60,8 +60,13 @@ func (p *Processor) Process(op contracts.Operation, params contracts.ImageParams
 		return Result{}, fmt.Errorf("auto rotate: %w", err)
 	}
 
-	if op == contracts.OpResize {
+	switch op {
+	case contracts.OpResize:
 		if err := resize(img, params); err != nil {
+			return Result{}, err
+		}
+	case contracts.OpPipeline:
+		if err := runSteps(img, params.Steps); err != nil {
 			return Result{}, err
 		}
 	}
@@ -79,7 +84,15 @@ func (p *Processor) Process(op contracts.Operation, params contracts.ImageParams
 		}
 	}
 
-	data, mime, ext, err := encode(img, format, params)
+	var (
+		data      []byte
+		mime, ext string
+	)
+	if op == contracts.OpPipeline && params.TargetBytes > 0 {
+		data, mime, ext, err = encodeUnder(img, format, params, params.TargetBytes)
+	} else {
+		data, mime, ext, err = encode(img, format, params)
+	}
 	if err != nil {
 		return Result{}, err
 	}

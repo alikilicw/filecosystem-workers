@@ -161,6 +161,8 @@ func resultName(msg contracts.JobMessage, ext string) string {
 		return fmt.Sprintf("%s-%s%s", base, dimensionSuffix(msg.Params), ext)
 	case contracts.OpCompress:
 		return base + "-compressed" + ext
+	case contracts.OpPipeline:
+		return base + "-edited" + ext
 	default:
 		return base + ext
 	}
