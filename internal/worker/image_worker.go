@@ -148,33 +148,12 @@ func (w *ImageWorker) publish(ctx context.Context, result contracts.JobResult) e
 	return nil
 }
 
-// resultName keeps the original stem and describes the transformation, so a
+// resultName keeps the original stem and marks the file as edited, so a
 // download folder full of results stays readable.
 func resultName(msg contracts.JobMessage, ext string) string {
 	base := strings.TrimSuffix(msg.SourceName, path.Ext(msg.SourceName))
 	if base == "" {
 		base = "image"
 	}
-
-	switch msg.Operation {
-	case contracts.OpResize:
-		return fmt.Sprintf("%s-%s%s", base, dimensionSuffix(msg.Params), ext)
-	case contracts.OpCompress:
-		return base + "-compressed" + ext
-	case contracts.OpPipeline:
-		return base + "-edited" + ext
-	default:
-		return base + ext
-	}
-}
-
-func dimensionSuffix(params contracts.ImageParams) string {
-	switch {
-	case params.Width > 0 && params.Height > 0:
-		return fmt.Sprintf("%dx%d", params.Width, params.Height)
-	case params.Width > 0:
-		return fmt.Sprintf("w%d", params.Width)
-	default:
-		return fmt.Sprintf("h%d", params.Height)
-	}
+	return base + "-edited" + ext
 }

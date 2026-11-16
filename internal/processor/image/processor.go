@@ -10,10 +10,6 @@ import (
 	"github.com/davidbyttow/govips/v2/vips"
 )
 
-// unboundedSide stands in for a missing width or height during a contain
-// resize; libvips needs both sides, so the free one is left effectively open.
-const unboundedSide = 1 << 20
-
 // paletteQualityThreshold is where PNG output switches to palette
 // quantisation, which is the only way to meaningfully shrink a PNG.
 const paletteQualityThreshold = 90
@@ -60,15 +56,11 @@ func (p *Processor) Process(op contracts.Operation, params contracts.ImageParams
 		return Result{}, fmt.Errorf("auto rotate: %w", err)
 	}
 
-	switch op {
-	case contracts.OpResize:
-		if err := resize(img, params); err != nil {
-			return Result{}, err
-		}
-	case contracts.OpPipeline:
-		if err := runSteps(img, params.Steps); err != nil {
-			return Result{}, err
-		}
+	if op != contracts.OpPipeline {
+		return Result{}, fmt.Errorf("unknown operation %q", op)
+	}
+	if err := runSteps(img, params.Steps); err != nil {
+		return Result{}, err
 	}
 
 	format := params.Format
@@ -88,7 +80,7 @@ func (p *Processor) Process(op contracts.Operation, params contracts.ImageParams
 		data      []byte
 		mime, ext string
 	)
-	if op == contracts.OpPipeline && params.TargetBytes > 0 {
+	if params.TargetBytes > 0 {
 		data, mime, ext, err = encodeUnder(img, format, params, params.TargetBytes)
 	} else {
 		data, mime, ext, err = encode(img, format, params)
@@ -98,32 +90,6 @@ func (p *Processor) Process(op contracts.Operation, params contracts.ImageParams
 	}
 
 	return Result{Data: data, Mime: mime, Ext: ext, Width: img.Width(), Height: img.Height()}, nil
-}
-
-func resize(img *vips.ImageRef, params contracts.ImageParams) error {
-	width, height := params.Width, params.Height
-
-	switch params.Fit {
-	case contracts.FitCover:
-		if err := img.Thumbnail(width, height, vips.InterestingCentre); err != nil {
-			return fmt.Errorf("resize (cover): %w", err)
-		}
-	case contracts.FitFill:
-		if err := img.ThumbnailWithSize(width, height, vips.InterestingNone, vips.SizeForce); err != nil {
-			return fmt.Errorf("resize (fill): %w", err)
-		}
-	default:
-		if width <= 0 {
-			width = unboundedSide
-		}
-		if height <= 0 {
-			height = unboundedSide
-		}
-		if err := img.ThumbnailWithSize(width, height, vips.InterestingNone, vips.SizeBoth); err != nil {
-			return fmt.Errorf("resize (contain): %w", err)
-		}
-	}
-	return nil
 }
 
 func encode(img *vips.ImageRef, format string, params contracts.ImageParams) ([]byte, string, string, error) {
