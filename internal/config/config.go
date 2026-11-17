@@ -35,7 +35,7 @@ func Load() (Config, error) {
 		Env:             env("APP_ENV", "development"),
 		Concurrency:     envInt("WORKER_CONCURRENCY", defaultConcurrency()),
 		MaxSourceBytes:  envInt64("MAX_SOURCE_BYTES", 50<<20),
-		JobTimeout:      envDuration("JOB_TIMEOUT", 2*time.Minute),
+		JobTimeout:      envDuration("JOB_TIMEOUT", 10*time.Minute),
 		ShutdownTimeout: envDuration("SHUTDOWN_TIMEOUT", 30*time.Second),
 		MetricsAddr:     env("METRICS_ADDR", ":8090"),
 		RabbitURL:       env("RABBITMQ_URL", ""),

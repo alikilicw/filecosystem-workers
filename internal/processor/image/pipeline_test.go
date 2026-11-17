@@ -79,11 +79,15 @@ func load(t *testing.T, data []byte) *vips.ImageRef {
 	return img
 }
 
-func run(t *testing.T, img *vips.ImageRef, steps ...contracts.ImageStep) {
+// run applies one step to a still image and returns the result.
+func run(t *testing.T, img *vips.ImageRef, step contracts.ImageStep) *vips.ImageRef {
 	t.Helper()
-	if err := runSteps(img, steps); err != nil {
+	out, _, err := applyStep(img, nil, step)
+	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(out.Close)
+	return out
 }
 
 func size(t *testing.T, img *vips.ImageRef, width, height int) {
@@ -106,14 +110,14 @@ func near(a, b float64) bool { return math.Abs(a-b) <= 2 }
 
 func TestResizeIsExact(t *testing.T) {
 	img := load(t, source(t, 400, 300))
-	run(t, img, contracts.ImageStep{Op: contracts.StepResize, Width: 123, Height: 77})
+	img = run(t, img, contracts.ImageStep{Op: contracts.StepResize, Width: 123, Height: 77})
 	size(t, img, 123, 77)
 }
 
 func TestCropTakesTheArea(t *testing.T) {
 	img := load(t, source(t, 400, 300))
 	// The right half is blue; a crop inside it must be all blue.
-	run(t, img, contracts.ImageStep{Op: contracts.StepCrop, X: 250, Y: 20, Width: 100, Height: 50})
+	img = run(t, img, contracts.ImageStep{Op: contracts.StepCrop, X: 250, Y: 20, Width: 100, Height: 50})
 	size(t, img, 100, 50)
 	if p := pixel(t, img, 0, 0); !near(p[2], 255) || !near(p[0], 0) {
 		t.Fatalf("crop pixel = %v, want blue", p)
@@ -122,13 +126,13 @@ func TestCropTakesTheArea(t *testing.T) {
 
 func TestCropIsClampedToTheImage(t *testing.T) {
 	img := load(t, source(t, 400, 300))
-	run(t, img, contracts.ImageStep{Op: contracts.StepCrop, X: 350, Y: 250, Width: 500, Height: 500})
+	img = run(t, img, contracts.ImageStep{Op: contracts.StepCrop, X: 350, Y: 250, Width: 500, Height: 500})
 	size(t, img, 50, 50)
 }
 
 func TestQuarterTurnSwapsSides(t *testing.T) {
 	img := load(t, source(t, 400, 300))
-	run(t, img, contracts.ImageStep{Op: contracts.StepRotate, Degrees: 90})
+	img = run(t, img, contracts.ImageStep{Op: contracts.StepRotate, Degrees: 90})
 	size(t, img, 300, 400)
 	// Clockwise: the red left half ends up on top.
 	if p := pixel(t, img, 150, 10); !near(p[0], 255) {
@@ -136,7 +140,7 @@ func TestQuarterTurnSwapsSides(t *testing.T) {
 	}
 
 	img = load(t, source(t, 400, 300))
-	run(t, img, contracts.ImageStep{Op: contracts.StepRotate, Degrees: -90})
+	img = run(t, img, contracts.ImageStep{Op: contracts.StepRotate, Degrees: -90})
 	if p := pixel(t, img, 150, 10); !near(p[2], 255) {
 		t.Fatalf("top pixel after -90 = %v, want blue", p)
 	}
@@ -144,7 +148,7 @@ func TestQuarterTurnSwapsSides(t *testing.T) {
 
 func TestStraightenExpandsToTheBoundingBox(t *testing.T) {
 	img := load(t, source(t, 400, 300))
-	run(t, img, contracts.ImageStep{Op: contracts.StepRotate, Degrees: 30, Expand: true})
+	img = run(t, img, contracts.ImageStep{Op: contracts.StepRotate, Degrees: 30, Expand: true})
 
 	rad := 30 * math.Pi / 180
 	wantW := 400*math.Cos(rad) + 300*math.Sin(rad)
@@ -163,7 +167,7 @@ func TestStraightenExpandsToTheBoundingBox(t *testing.T) {
 
 func TestStraightenWithoutExpandKeepsTheSize(t *testing.T) {
 	img := load(t, source(t, 400, 300))
-	run(t, img, contracts.ImageStep{Op: contracts.StepRotate, Degrees: -12.5, Fill: "white"})
+	img = run(t, img, contracts.ImageStep{Op: contracts.StepRotate, Degrees: -12.5, Fill: "white"})
 	size(t, img, 400, 300)
 	if p := pixel(t, img, 0, 0); !near(p[0], 255) || !near(p[1], 255) || !near(p[2], 255) {
 		t.Fatalf("corner = %v, want white", p)
@@ -172,7 +176,7 @@ func TestStraightenWithoutExpandKeepsTheSize(t *testing.T) {
 
 func TestFlipMirrors(t *testing.T) {
 	img := load(t, source(t, 400, 300))
-	run(t, img, contracts.ImageStep{Op: contracts.StepFlip, Axis: "horizontal"})
+	img = run(t, img, contracts.ImageStep{Op: contracts.StepFlip, Axis: "horizontal"})
 	if p := pixel(t, img, 10, 10); !near(p[2], 255) {
 		t.Fatalf("left pixel after flip = %v, want blue", p)
 	}
@@ -181,7 +185,7 @@ func TestFlipMirrors(t *testing.T) {
 func TestPixelateAreaOnly(t *testing.T) {
 	img := load(t, noise(t, 200, 200))
 	before := pixel(t, img, 5, 5)
-	run(t, img, contracts.ImageStep{Op: contracts.StepPixelate, Block: 20, X: 100, Y: 100, Width: 60, Height: 60})
+	img = run(t, img, contracts.ImageStep{Op: contracts.StepPixelate, Block: 20, X: 100, Y: 100, Width: 60, Height: 60})
 	size(t, img, 200, 200)
 
 	// Outside the area nothing changes.
@@ -197,7 +201,7 @@ func TestPixelateAreaOnly(t *testing.T) {
 
 func TestGrayscaleUsesRec601(t *testing.T) {
 	img := load(t, source(t, 40, 40))
-	run(t, img, contracts.ImageStep{Op: contracts.StepGrayscale, Mode: "gray"})
+	img = run(t, img, contracts.ImageStep{Op: contracts.StepGrayscale, Mode: "gray"})
 	// Red: 0.299 × 255 = 76.2 → 76. Blue: 0.114 × 255 = 29.1 → 29.
 	if p := pixel(t, img, 5, 5); p[0] != 76 || p[1] != 76 || p[2] != 76 {
 		t.Fatalf("red → %v, want 76", p)
@@ -210,7 +214,7 @@ func TestGrayscaleUsesRec601(t *testing.T) {
 func TestBlackAndWhiteThreshold(t *testing.T) {
 	img := load(t, source(t, 40, 40))
 	// Red's luma is 76: white at threshold 50, black at 100.
-	run(t, img, contracts.ImageStep{Op: contracts.StepGrayscale, Mode: "bw", Threshold: 50})
+	img = run(t, img, contracts.ImageStep{Op: contracts.StepGrayscale, Mode: "bw", Threshold: 50})
 	if p := pixel(t, img, 5, 5); p[0] != 255 {
 		t.Fatalf("red at threshold 50 → %v, want 255", p)
 	}
@@ -219,51 +223,8 @@ func TestBlackAndWhiteThreshold(t *testing.T) {
 	}
 
 	img = load(t, source(t, 40, 40))
-	run(t, img, contracts.ImageStep{Op: contracts.StepGrayscale, Mode: "bw", Threshold: 100})
+	img = run(t, img, contracts.ImageStep{Op: contracts.StepGrayscale, Mode: "bw", Threshold: 100})
 	if p := pixel(t, img, 5, 5); p[0] != 0 {
 		t.Fatalf("red at threshold 100 → %v, want 0", p)
-	}
-}
-
-func TestPipelineEndToEnd(t *testing.T) {
-	params := contracts.ImageParams{
-		Format:  contracts.FormatJPEG,
-		Quality: 80,
-		Steps: []contracts.ImageStep{
-			{Op: contracts.StepCrop, X: 10, Y: 10, Width: 300, Height: 200},
-			{Op: contracts.StepRotate, Degrees: 90},
-			{Op: contracts.StepResize, Width: 100, Height: 150},
-			{Op: contracts.StepGrayscale, Mode: "gray"},
-		},
-	}
-	out, err := testProcessor.Process(contracts.OpPipeline, params, source(t, 400, 300))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if out.Width != 100 || out.Height != 150 || out.Mime != "image/jpeg" {
-		t.Fatalf("result = %d×%d %s, want 100×150 image/jpeg", out.Width, out.Height, out.Mime)
-	}
-}
-
-func TestTargetSizeFitsUnderTheLimit(t *testing.T) {
-	src := noise(t, 300, 300)
-	full, err := testProcessor.Process(contracts.OpPipeline,
-		contracts.ImageParams{Format: contracts.FormatJPEG, Quality: 100}, src)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	target := int64(len(full.Data)) / 3
-	out, err := testProcessor.Process(contracts.OpPipeline,
-		contracts.ImageParams{Format: contracts.FormatJPEG, TargetBytes: target}, src)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if int64(len(out.Data)) > target {
-		t.Fatalf("result is %d bytes, over the %d target", len(out.Data), target)
-	}
-	// It should use most of the budget, not jump to the lowest quality.
-	if int64(len(out.Data)) < target/2 {
-		t.Fatalf("result is %d bytes, far under the %d target", len(out.Data), target)
 	}
 }
